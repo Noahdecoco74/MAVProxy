@@ -943,7 +943,10 @@ class LinkModule(mp_module.MPModule):
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
-            self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            ########## Modified by Noah.R ##########
+            if self.mpstate.module('router') is None or self.mpstate.module('router').check(m, self.mpstate.sysid_outputs[sysid].address):
+                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            ####################
             if mtype == "GLOBAL_POSITION_INT":
                 for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
                     mod = self.module(modname)
@@ -958,12 +961,18 @@ class LinkModule(mp_module.MPModule):
         if mtype == 'GLOBAL_POSITION_INT':
             # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
             for sysid in self.mpstate.sysid_outputs:
-                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+                ########## Modified by Noah.R ##########
+                if self.mpstate.module('router') is None or self.mpstate.module('router').check(m, self.mpstate.sysid_outputs[sysid].address):
+                    self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+                ####################
 
             if self.mpstate.settings.fwdpos:
                 for link in self.mpstate.mav_master:
                     if link != master:
-                        link.write(m.get_msgbuf())
+                        ########## Modified by Noah.R ##########
+                        if self.mpstate.module('router') is None or self.mpstate.module('router').check(m, link.address):
+                            link.write(m.get_msgbuf())
+                        ####################
 
         # and log them
         if mtype not in dataPackets and self.mpstate.logqueue:
@@ -1015,7 +1024,10 @@ class LinkModule(mp_module.MPModule):
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
                 if mtype not in self.no_fwd_types:
                     for r in self.mpstate.mav_outputs:
-                        r.write(m.get_msgbuf())
+                        ########## Modified by Noah.R ##########
+                        if self.mpstate.module('router') is None or self.mpstate.module('router').check(m, r.address):
+                            r.write(m.get_msgbuf())
+                        ####################
 
             sysid = m.get_srcSystem()
             target_sysid = self.target_system

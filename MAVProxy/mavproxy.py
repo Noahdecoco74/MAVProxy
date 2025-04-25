@@ -881,10 +881,21 @@ def process_mavlink(slave):
             target_sysid = getattr(m, 'target_system', -1)
             mbuf = m.get_msgbuf()
             if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
-                mpstate.mav_master[mpstate.settings.mavfwd_link-1].write(mbuf)
+                ########## Modified by Noah.R ##########
+                if mpstate.module('router') is None or mpstate.module('router').check(m, mpstate.mav_master[mpstate.settings.mavfwd_link-1].address):
+                    mpstate.mav_master[mpstate.settings.mavfwd_link-1].write(mbuf)
             else:
                 # find best link by sysid
-                mpstate.master(target_sysid).write(mbuf)
+                if mpstate.module('router') is None or mpstate.module('router').check(m, mpstate.master(target_sysid).address):
+                    mpstate.master(target_sysid).write(mbuf)
+            if mpstate.module('router') is not None:
+                for slave_e in mpstate.mav_outputs:
+                    if slave_e.fd != slave.fd:  # We check that we aren't going to send the msg to the expeditor
+                        if mpstate.module('router').router_config is not None and mpstate.module('router').check(m, slave_e.address):
+                            # We check if router_config is not None to prevent forwarding output -> output
+                            # if the user doesn't want to use MAVProxy router
+                            slave_e.write(mbuf)
+            ####################
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
@@ -1341,6 +1352,9 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')
     parser.add_option("--udp-timeout",dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")
     parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
+    ########## Added by Noah.R ##########
+    parser.add_option("--router-config", dest="router_config", default=None, help="Indicates a default router_config file to load")
+    ####################
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1433,6 +1447,11 @@ if __name__ == '__main__':
     for sig in fatalsignals:
         signal.signal(sig, quit_handler)
 
+    ########## Added by Noah.R ##########
+    if opts.router_config is not None:
+        if mpstate.load_module('router', quiet=False) and mpstate.module('router').load(opts.router_config):
+            mpstate.module('router').start()
+    ####################
     mpstate.load_module('link', quiet=True)
 
     mpstate.settings.source_system = opts.SOURCE_SYSTEM
